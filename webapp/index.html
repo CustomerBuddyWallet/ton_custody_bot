@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TonBuddy Wallet</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- Top -->
+    <header class="top">
+      <div class="brand">
+        <div class="logo">💎</div>
+        <div class="brandText">
+          <div class="brandTitle">TonBuddy</div>
+          <div class="brandSub" id="userLine">Подключаюсь…</div>
+        </div>
+      </div>
+
+      <button class="iconBtn" id="btnSettings" title="Настройки">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </button>
+    </header>
+
+    <!-- Balance card -->
+    <section class="card balanceCard">
+      <div class="balanceTop">
+        <div>
+          <div class="muted">Общий баланс</div>
+          <div class="big" id="uahBalance">— UAH</div>
+        </div>
+        <div class="pill" id="ratePill">TON</div>
+      </div>
+
+      <div class="balanceBottom">
+        <div class="muted small">TON</div>
+        <div class="tonLine">
+          <span class="tonValue" id="tonBalance">—</span>
+          <span class="muted small">TON</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick actions -->
+    <section class="actions">
+      <button class="actionBtn" id="actDeposit">
+        <div class="actionIcon">➕</div>
+        <div class="actionText">Пополнить</div>
+      </button>
+
+      <button class="actionBtn" id="actWithdraw">
+        <div class="actionIcon">📤</div>
+        <div class="actionText">Вывести</div>
+      </button>
+
+      <button class="actionBtn" id="actSwap">
+        <div class="actionIcon">🔁</div>
+        <div class="actionText">Обмен</div>
+      </button>
+
+      <button class="actionBtn" id="actRefresh">
+        <div class="actionIcon">🔄</div>
+        <div class="actionText">Обновить</div>
+      </button>
+    </section>
+
+    <!-- Promo / info -->
+    <section class="card promo" id="promoCard">
+      <div class="promoTitle">⚡ Быстрый режим</div>
+      <div class="promoText">Баланс и реквизиты приходят через бота в чат. Дальше сделаем полностью внутри Mini App.</div>
+      <button class="promoBtn" id="promoOk">Понял</button>
+    </section>
+
+    <!-- Assets -->
+    <section class="assets">
+      <div class="assetsHead">
+        <div class="assetsTitle">Мои активы</div>
+        <button class="linkBtn" id="btnHideSmall">Скрыть мелкие</button>
+      </div>
+
+      <div class="assetList" id="assetList">
+        <!-- будет заполнено JS -->
+      </div>
+
+      <div class="footerHint" id="status">Готово.</div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
