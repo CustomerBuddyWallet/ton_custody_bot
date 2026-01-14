@@ -3,7 +3,7 @@ import hmac
 import hashlib
 import urllib.parse
 import json
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
@@ -19,11 +19,11 @@ WITHDRAW_ENABLED = os.getenv("WITHDRAW_ENABLED", "0").strip() == "1"
 
 app = FastAPI(title="TonBuddy API", version="0.1.0")
 
-# CORS: пока можно широко, потом ужмём под твой домен Pages
+# CORS: для GitHub Pages можно оставить "*", позже сузим до домена
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -31,12 +31,16 @@ app.add_middleware(
 def ton_fmt(nano: int) -> str:
     return f"{nano/1e9:.9f}"
 
-def verify_init_data(init_data: str) -> dict:
+def verify_init_data(init_data: str) -> Dict[str, Any]:
     """
     Проверка подписи Telegram WebApp initData.
+    Требует BOT_TOKEN (иначе 500).
     """
     if not init_data:
         raise HTTPException(status_code=401, detail="Missing initData")
+
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="BOT_TOKEN not configured in environment")
 
     parsed = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
     received_hash = parsed.pop("hash", None)
@@ -45,8 +49,8 @@ def verify_init_data(init_data: str) -> dict:
 
     data_check_string = "\n".join([f"{k}={parsed[k]}" for k in sorted(parsed.keys())])
 
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
+    computed_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(computed_hash, received_hash):
         raise HTTPException(status_code=401, detail="Bad signature")
@@ -55,7 +59,11 @@ def verify_init_data(init_data: str) -> dict:
     if not user_raw:
         raise HTTPException(status_code=401, detail="Missing user")
 
-    user = json.loads(user_raw)
+    try:
+        user = json.loads(user_raw)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Bad user JSON")
+
     return user
 
 @app.on_event("startup")
@@ -75,6 +83,10 @@ async def api_deposit(x_tg_init_data: Optional[str] = Header(default=None)):
     user = verify_init_data(x_tg_init_data or "")
     tg_id = int(user["id"])
     await ensure_user(tg_id)
+
+    if not BANK_ADDRESS:
+        raise HTTPException(status_code=500, detail="BANK_ADDRESS not configured")
+
     memo = await get_or_create_memo(tg_id)
     return {"bank_address": BANK_ADDRESS, "memo": memo}
 
