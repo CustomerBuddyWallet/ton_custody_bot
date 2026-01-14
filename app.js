@@ -1,156 +1,223 @@
+/* global Telegram */
 const tg = window.Telegram?.WebApp;
 
-const userLine = document.getElementById("userLine");
-const uahBalance = document.getElementById("uahBalance");
-const tonBalance = document.getElementById("tonBalance");
-const statusEl = document.getElementById("status");
+const $ = (id) => document.getElementById(id);
 
-const promoCard = document.getElementById("promoCard");
-document.getElementById("promoOk").onclick = () => promoCard.style.display = "none";
+const API_BASE =
+  // 1) для локального теста:
+  // "http://127.0.0.1:8000"
+  // 2) для прода (Render/Fly и т.п.) поставим позже:
+  (window.API_BASE_OVERRIDE || "http://127.0.0.1:8000");
 
-function setStatus(t){ statusEl.textContent = t; }
-function fmt(n, d=2){ if(n===null||n===undefined||Number.isNaN(n)) return "—"; return Number(n).toFixed(d); }
+let hideDust = false;
 
-const API_BASE = ""; 
-// IMPORTANT: после хостинга сюда не надо ничего — мы будем делать относительные запросы к тому же домену.
-// Но пока ты тестишь локально, можно оставить пусто.
+// CoinGecko ids (актуально и удобно)
+const COINS = [
+  { sym: "TON", name: "Toncoin",  cg: "toncoin" },
+  { sym: "NOT", name: "Notcoin",  cg: "notcoin" },
+  { sym: "USDT", name: "Tether",  cg: "tether" },
+  { sym: "DOGE", name: "Dogecoin", cg: "dogecoin" },
+  { sym: "PEPE", name: "Pepe",     cg: "pepe" },
+  { sym: "MAJOR", name: "MAJOR",   cg: "major" },
+];
+
+function setStatus(msg) { $("statusLine").textContent = msg; }
+
+function fmtUsd(x){
+  if (!isFinite(x)) return "$0.00";
+  return "$" + x.toFixed(2);
+}
+
+function fmtAmt(x){
+  if (!isFinite(x)) return "0";
+  if (x === 0) return "0";
+  if (x < 0.0001) return x.toFixed(8);
+  if (x < 1) return x.toFixed(6);
+  return x.toFixed(4);
+}
 
 async function apiGet(path){
-  if (!tg) throw new Error("Open in Telegram");
-  const r = await fetch(`${API_BASE}${path}`, {
+  const url = API_BASE.replace(/\/$/, "") + path;
+  const initData = tg?.initData || "";
+  const r = await fetch(url, {
+    method: "GET",
     headers: {
-      "X-TG-INIT-DATA": tg.initData
-    }
+      "Content-Type": "application/json",
+      // чтобы бек понимал, кто юзер:
+      "X-TG-INITDATA": initData,
+    },
   });
   if (!r.ok) throw new Error(`API ${r.status}`);
-  return await r.json();
+  return r.json();
 }
 
-function setTonAmount(ton){
-  tonBalance.textContent = fmt(ton, 9);
-
-  // UAH тут пока условный курс (для красоты)
-  const rate = 200; // потом подтянем реальный
-  uahBalance.textContent = `₴${fmt((Number(ton)||0)*rate, 2)}`;
+async function apiPost(path, body){
+  const url = API_BASE.replace(/\/$/, "") + path;
+  const initData = tg?.initData || "";
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-TG-INITDATA": initData,
+    },
+    body: JSON.stringify(body || {}),
+  });
+  if (!r.ok) throw new Error(`API ${r.status}`);
+  return r.json();
 }
 
-function showModal(title, body, actions=[]){
-  // простой псевдо-модал (без библиотек)
-  const overlay = document.createElement("div");
-  overlay.style.cssText = `
-    position:fixed; inset:0; background:rgba(0,0,0,.55);
-    display:flex; align-items:center; justify-content:center;
-    padding:16px; z-index:9999;
-  `;
-  const box = document.createElement("div");
-  box.style.cssText = `
-    width:min(420px,100%);
-    background:rgba(18,26,45,.98);
-    border:1px solid rgba(255,255,255,.10);
-    border-radius:18px;
-    padding:14px;
-    box-shadow:0 25px 70px rgba(0,0,0,.55);
-  `;
-  const h = document.createElement("div");
-  h.textContent = title;
-  h.style.cssText = "font-weight:950; font-size:16px; margin-bottom:8px;";
-  const p = document.createElement("div");
-  p.innerHTML = body;
-  p.style.cssText = "color:#9fb0d4; font-size:13px; line-height:1.35; white-space:pre-wrap;";
-  const row = document.createElement("div");
-  row.style.cssText = "display:flex; gap:10px; margin-top:12px;";
+async function fetchPricesUsd(){
+  // CoinGecko simple price (без ключа, но не долби каждую секунду)
+  const ids = COINS.map(c => c.cg).join(",");
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Price fetch failed");
+  return r.json();
+}
 
-  const closeBtn = document.createElement("button");
-  closeBtn.textContent = "Закрыть";
-  closeBtn.style.cssText = `
-    flex:1; padding:12px; border-radius:14px; border:1px solid rgba(255,255,255,.12);
-    background:rgba(255,255,255,.06); color:#eaf0ff; font-weight:900; cursor:pointer;
-  `;
-  closeBtn.onclick = () => overlay.remove();
+function renderAssets(balances, prices){
+  // balances: { TON: number, ... } (в твоей базе пока реалистично только TON)
+  const list = $("assetsList");
+  list.innerHTML = "";
 
-  row.appendChild(closeBtn);
+  for (const c of COINS){
+    const bal = Number(balances?.[c.sym] || 0);
+    const p = prices?.[c.cg]?.usd ?? 0;
+    const change = prices?.[c.cg]?.usd_24h_change;
 
-  for (const a of actions){
-    const b = document.createElement("button");
-    b.textContent = a.text;
-    b.style.cssText = `
-      flex:1; padding:12px; border-radius:14px; border:0;
-      background:#4b7bec; color:#fff; font-weight:950; cursor:pointer;
+    const fiat = bal * p;
+
+    if (hideDust && fiat < 0.01) continue;
+
+    const el = document.createElement("div");
+    el.className = "asset";
+
+    const badge = c.sym.slice(0,1);
+
+    const chStr = (typeof change === "number")
+      ? ` • ${change >= 0 ? "+" : ""}${change.toFixed(2)}%`
+      : "";
+
+    el.innerHTML = `
+      <div class="left">
+        <div class="coinIcon">${badge}</div>
+        <div class="meta">
+          <div class="coinName">${c.name}</div>
+          <div class="coinSub">${c.sym} • $${Number(p || 0).toFixed(6)}${chStr}</div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="amt">${fmtAmt(bal)} ${c.sym}</div>
+        <div class="fiat">${fmtUsd(fiat)}</div>
+      </div>
     `;
-    b.onclick = async () => { try { await a.onClick(); } finally { overlay.remove(); } };
-    row.appendChild(b);
+    list.appendChild(el);
   }
-
-  box.appendChild(h);
-  box.appendChild(p);
-  box.appendChild(row);
-  overlay.appendChild(box);
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-  document.body.appendChild(overlay);
 }
 
-async function refreshBalance(){
+async function refreshAll(){
   try{
-    setStatus("Обновляю баланс…");
-    const data = await apiGet("/api/balance");
-    setTonAmount(data.ton);
-    setStatus("Баланс обновлён.");
+    setStatus("Обновляю…");
+    const [balRes, prices] = await Promise.all([
+      apiGet("/api/balance"),
+      fetchPricesUsd(),
+    ]);
+
+    // balRes пример: { ton: 0.123456789 }
+    const ton = Number(balRes?.ton || 0);
+    const tonPrice = Number(prices?.toncoin?.usd || 0);
+    $("totalTon").textContent = `${ton.toFixed(9)} TON`;
+    $("totalFiat").textContent = fmtUsd(ton * tonPrice);
+
+    // Пока мульти-активов в базе нет — показываем 0, но с реальным курсом.
+    renderAssets({ TON: ton, NOT: 0, USDT: 0, DOGE: 0, PEPE: 0, MAJOR: 0 }, prices);
+
+    setStatus("Готово.");
   }catch(e){
-    setStatus("Не могу получить баланс (пока нет хоста/HTTPS или не из Telegram).");
+    console.error(e);
+    setStatus("Ошибка обновления. Проверь API_BASE/хостинг и CORS.");
   }
 }
 
 async function openDeposit(){
   try{
-    setStatus("Загружаю реквизиты…");
-    const d = await apiGet("/api/deposit");
-    const body = `
-<b>Адрес банка</b>\n${d.bank_address}\n\n
-<b>Комментарий (memo)</b>\n${d.memo}\n\n
-Комментарий нужен, чтобы пополнение зачлось автоматически.
-    `.trim().replaceAll("\n", "<br>");
-    showModal("Пополнение", body, [
-      { text:"Скопировать", onClick: async ()=>{
-        const txt = `${d.bank_address}\n${d.memo}`;
-        if (navigator.clipboard) await navigator.clipboard.writeText(txt);
-        setStatus("Скопировано.");
-      }}
-    ]);
+    $("depositCard").style.display = "block";
+    setStatus("Получаю реквизиты…");
+    const dep = await apiGet("/api/deposit");
+    // dep: { address: "...", memo: "..." }
+    $("depAddress").textContent = dep.address || "—";
+    $("depMemo").textContent = dep.memo || "—";
     setStatus("Реквизиты готовы.");
   }catch(e){
-    setStatus("Не могу получить реквизиты (нужен хост/HTTPS и запуск из Telegram).");
+    console.error(e);
+    setStatus("Не могу получить реквизиты. Нужен доступ к API.");
   }
 }
 
-function openWithdraw(){
-  showModal(
-    "Вывод",
-    "Выводы временно отключены (техработы).",
-    []
-  );
+function copyText(txt){
+  if (!txt || txt === "—") return;
+  navigator.clipboard.writeText(txt).then(() => {
+    tg?.HapticFeedback?.notificationOccurred("success");
+    setStatus("Скопировано ✅");
+  }).catch(() => setStatus("Не удалось скопировать"));
 }
 
-document.getElementById("actRefresh").onclick = refreshBalance;
-document.getElementById("actDeposit").onclick = openDeposit;
-document.getElementById("actWithdraw").onclick = openWithdraw;
+function boot(){
+  if (tg){
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor?.("#0b1220");
+    tg.setBackgroundColor?.("#0b1220");
 
-document.getElementById("actSwap").onclick = () => setStatus("Обмен: скоро.");
-document.getElementById("btnHideSmall").onclick = () => setStatus("Скрытие мелких: скоро.");
-document.getElementById("btnSettings").onclick = () => setStatus("Настройки: скоро.");
+    const u = tg.initDataUnsafe?.user;
+    const name = u?.first_name ? `${u.first_name}${u.last_name ? " " + u.last_name : ""}` : "unknown";
+    const uname = u?.username ? `@${u.username}` : "(без username)";
+    $("userLine").textContent = `${name} • ${uname}`;
+  } else {
+    $("userLine").textContent = "Открыто вне Telegram (локальный тест)";
+  }
 
-// INIT
-if (tg) {
-  tg.ready();
-  tg.expand();
+  $("btnRefresh").addEventListener("click", refreshAll);
+  $("btnDeposit").addEventListener("click", openDeposit);
 
-  const u = tg.initDataUnsafe?.user;
-  const name = u ? [u.first_name, u.last_name].filter(Boolean).join(" ") : "unknown";
-  const uname = u?.username ? "@"+u.username : "(без username)";
-  userLine.textContent = `${name} • ${uname}`;
+  $("btnWithdraw").addEventListener("click", async () => {
+    // Кнопка есть, но вывод отключён
+    setStatus("Вывод временно отключён.");
+    tg?.showPopup?.({
+      title: "Вывод",
+      message: "Вывод временно отключён.",
+      buttons: [{type:"ok"}]
+    });
+  });
 
-  setTonAmount(0);
-  setStatus("Готово. Нажми «Обновить».");
-} else {
-  userLine.textContent = "Открой внутри Telegram";
-  setStatus("Открой Mini App внутри Telegram, локально API не работает.");
+  $("btnSwap").addEventListener("click", () => {
+    setStatus("Обмен скоро будет (пока заглушка).");
+    tg?.showPopup?.({
+      title: "Обмен",
+      message: "Обмен в разработке.",
+      buttons: [{type:"ok"}]
+    });
+  });
+
+  $("closeDeposit").addEventListener("click", () => {
+    $("depositCard").style.display = "none";
+  });
+
+  document.querySelectorAll(".copyBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const t = btn.getAttribute("data-copy");
+      if (t === "address") copyText($("depAddress").textContent.trim());
+      if (t === "memo") copyText($("depMemo").textContent.trim());
+    });
+  });
+
+  $("toggleDust").addEventListener("click", () => {
+    hideDust = !hideDust;
+    $("toggleDust").textContent = hideDust ? "Показать мелкие" : "Скрыть мелкие";
+    refreshAll();
+  });
+
+  refreshAll();
 }
+
+boot();
