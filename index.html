@@ -1,96 +1,90 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>TonBuddy Wallet</title>
-
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./style.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="app">
-    <!-- Top -->
-    <header class="top">
+  <div class="bg"></div>
+
+  <div class="wrap">
+    <header class="topbar">
       <div class="brand">
-        <div class="logo">💎</div>
-        <div class="brandText">
-          <div class="brandTitle">TonBuddy</div>
-          <div class="brandSub" id="userLine">Подключаюсь…</div>
+        <div class="logo">◆</div>
+        <div>
+          <div class="name">TonBuddy</div>
+          <div class="sub">YOUR TRUSTED TON WALLET COMPANY</div>
+          <div class="sub" id="userLine">Загрузка…</div>
         </div>
       </div>
-
-      <button class="iconBtn" id="btnSettings" title="Настройки">
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      </button>
+      <button class="iconBtn" id="menuBtn" title="Меню">⋯</button>
     </header>
 
-    <!-- Balance card -->
-    <section class="card balanceCard">
-      <div class="balanceTop">
-        <div>
-          <div class="muted">Общий баланс</div>
-          <div class="big" id="uahBalance">— UAH</div>
-        </div>
-        <div class="pill" id="ratePill">TON</div>
+    <section class="card big">
+      <div class="row">
+        <div class="label">Общий баланс</div>
+        <div class="pill" id="currencyPill">USD</div>
       </div>
-
-      <div class="balanceBottom">
-        <div class="muted small">TON</div>
-        <div class="tonLine">
-          <span class="tonValue" id="tonBalance">—</span>
-          <span class="muted small">TON</span>
-        </div>
-      </div>
+      <div class="total" id="totalFiat">$0.00</div>
+      <div class="muted" id="totalTon">0.000000000 TON</div>
     </section>
 
-    <!-- Quick actions -->
     <section class="actions">
-      <button class="actionBtn" id="actDeposit">
-        <div class="actionIcon">➕</div>
-        <div class="actionText">Пополнить</div>
+      <button class="action" id="btnDeposit">
+        <span class="ic">＋</span><span>Пополнить</span>
       </button>
-
-      <button class="actionBtn" id="actWithdraw">
-        <div class="actionIcon">📤</div>
-        <div class="actionText">Вывести</div>
+      <button class="action" id="btnWithdraw">
+        <span class="ic">⇩</span><span>Вывести</span>
       </button>
-
-      <button class="actionBtn" id="actSwap">
-        <div class="actionIcon">🔁</div>
-        <div class="actionText">Обмен</div>
+      <button class="action" id="btnSwap">
+        <span class="ic">⇄</span><span>Обмен</span>
       </button>
-
-      <button class="actionBtn" id="actRefresh">
-        <div class="actionIcon">🔄</div>
-        <div class="actionText">Обновить</div>
+      <button class="action" id="btnRefresh">
+        <span class="ic">⟳</span><span>Обновить</span>
       </button>
     </section>
 
-    <!-- Promo / info -->
-    <section class="card promo" id="promoCard">
-      <div class="promoTitle">⚡ Быстрый режим</div>
-      <div class="promoText">Баланс и реквизиты приходят через бота в чат. Дальше сделаем полностью внутри Mini App.</div>
-      <button class="promoBtn" id="promoOk">Понял</button>
-    </section>
-
-    <!-- Assets -->
-    <section class="assets">
-      <div class="assetsHead">
-        <div class="assetsTitle">Мои активы</div>
-        <button class="linkBtn" id="btnHideSmall">Скрыть мелкие</button>
+    <section class="card" id="depositCard" style="display:none;">
+      <div class="row">
+        <div class="title">Пополнение TON</div>
+        <button class="chip" id="closeDeposit">Закрыть</button>
       </div>
 
-      <div class="assetList" id="assetList">
-        <!-- будет заполнено JS -->
+      <div class="field">
+        <div class="fieldLabel">Адрес</div>
+        <div class="copyRow">
+          <div class="mono" id="depAddress">—</div>
+          <button class="copyBtn" data-copy="address">Копировать</button>
+        </div>
       </div>
 
-      <div class="footerHint" id="status">Готово.</div>
+      <div class="field">
+        <div class="fieldLabel">Комментарий (memo)</div>
+        <div class="copyRow">
+          <div class="mono" id="depMemo">—</div>
+          <button class="copyBtn" data-copy="memo">Копировать</button>
+        </div>
+        <div class="hint">Memo нужен, чтобы система зачла депозит на твой аккаунт (если у всех общий адрес).</div>
+      </div>
     </section>
+
+    <section class="listHeader">
+      <div class="hTitle">Мои активы</div>
+      <button class="linkBtn" id="toggleDust">Скрыть мелкие</button>
+    </section>
+
+    <section class="assets" id="assetsList">
+      <!-- items -->
+    </section>
+
+    <footer class="foot">
+      <div class="footText" id="statusLine">Готов.</div>
+    </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
